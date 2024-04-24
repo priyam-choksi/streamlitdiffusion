@@ -1,88 +1,63 @@
-import os
-
 import streamlit as st
+from PIL import Image
+import requests
+from io import BytesIO
+import random
 
-import torch
-from torch import autocast
-from diffusers import StableDiffusionPipeline
+# List of sample prompts for generating random prompts
+sample_prompts = [
+    "A futuristic cityscape at night, illuminated by neon lights",
+    "A serene landscape with a mountain in the background and a lake in the foreground during sunrise",
+    "An astronaut riding a horse on Mars",
+    "A surreal painting of a cat with wings flying through a starry sky",
+    "A portrait of a Victorian steampunk inventor in her workshop",
+    "An ancient tree with a door leading into it, set in an enchanted forest",
+    "A digital artwork of a cybernetic owl",
+    "A scene from a busy medieval market",
+    "A still life of futuristic gadgets on a table",
+    "A dystopian city during a rainstorm"
+]
 
+def image_generation(prompt):
+    """Generate an image from a prompt using the Hugging Face Stable Diffusion API."""
+    url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+    headers = {'Authorization': 'Bearer YOUR_TOKEN_HERE'}
+    try:
+        response = requests.post(url, headers=headers, json={"inputs": prompt})
+        response.raise_for_status()  # Raises an HTTPError for bad responses
+        return Image.open(BytesIO(response.content))
+    except requests.exceptions.HTTPError as errh:
+        st.error(f"HTTP Error: {errh}")
+    except requests.exceptions.ConnectionError as errc:
+        st.error(f"Error Connecting: {errc}")
+    except requests.exceptions.Timeout as errt:
+        st.error(f"Timeout Error: {errt}")
+    except requests.exceptions.RequestException as err:
+        st.error(f"Error: {err}")
+    return None
 
-# st.set_page_config(layout="wide")
+def main():
+    st.set_page_config(page_title="G-AI-IG")
+    st.title("AI Image Generator")
+    st.write("Enter a description of the image you want to generate, or generate a random prompt!")
 
-st.title('Play with Stable-Diffusion v1-4')
+    if 'prompt' not in st.session_state or st.button("Generate Random Prompt"):
+        st.session_state['prompt'] = random.choice(sample_prompts)
 
-model_id = "CompVis/stable-diffusion-v1-4"
-device = "cuda" if torch.cuda.is_available() else "cpu"
-auth_token = os.environ.get("StableDiffusion") or True
+    prompt = st.text_input("Enter the prompt to generate an image:", value=st.session_state['prompt'])
+    st.session_state['prompt'] = prompt
 
+    if st.button("Generate Image"):
+        with st.spinner('Generating image... Please wait.'):
+            output_image = image_generation(prompt)
+            if output_image:
+                st.image(output_image, caption="Generated Image", use_column_width=True)
+                st.success("Image generated successfully!")
+                buf = BytesIO()
+                output_image.save(buf, format="PNG")
+                st.download_button("Download Image", buf.getvalue(), file_name="generated_image.png", mime="image/png")
+            else:
+                st.error("Failed to generate image. Please check the prompt or try again later.")
 
-with st.spinner(
-	text='Loading...'
-):
-	pipe = StableDiffusionPipeline.from_pretrained(
-		model_id,
-		revision="fp16",
-		torch_dtype=torch.float16,
-		use_auth_token=auth_token
-	)
-
-	pipe = pipe.to(device)
-
-
-def infer(prompt, samples=2, steps=30, scale=7.5, seed=25):
-	generator = torch.Generator(device=device).manual_seed(seed)
-
-	with autocast("cuda"):
-		images_list = pipe(
-			[prompt] * samples,
-			num_inference_steps=steps,
-			guidance_scale=scale,
-			generator=generator
-		)
-
-	return images_list["sample"]
-
-
-with st.form(key='new'):
-
-	prompt = st.text_area(label='Enter prompt')
-
-	col1, col2, col3 = st.columns(3)
-
-	with st.expander(label='Expand parameters'):
-		n_samples = col1.select_slider(
-			label='Num images',
-			options=range(1, 5),
-			value=1
-		)
-
-		steps = col2.select_slider(
-			label='Steps',
-			options=range(1, 101),
-			value=40
-		)
-
-		scale = col3.select_slider(
-			label='Guidance Scale',
-			options=range(1, 21),
-			value=7
-		)
-
-	st.form_submit_button()
-
-	if prompt:
-		images = infer(
-			prompt,
-			samples=n_samples,
-			steps=steps,
-			scale=scale
-		)
-
-		for image in images:
-			st.image(image)
-		with torch.no_grad():
-			torch.cuda.empty_cache()
-			pipe.to('cpu')
-			pipe = None
-	else:
-		st.warning('Enter prompt.')
+if __name__ == "__main__":
+    main()
