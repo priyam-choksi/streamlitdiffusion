@@ -4,60 +4,57 @@ import requests
 from io import BytesIO
 import random
 
-# List of sample prompts for generating random prompts
-sample_prompts = [
-    "A futuristic cityscape at night, illuminated by neon lights",
-    "A serene landscape with a mountain in the background and a lake in the foreground during sunrise",
-    "An astronaut riding a horse on Mars",
-    "A surreal painting of a cat with wings flying through a starry sky",
-    "A portrait of a Victorian steampunk inventor in her workshop",
-    "An ancient tree with a door leading into it, set in an enchanted forest",
-    "A digital artwork of a cybernetic owl",
-    "A scene from a busy medieval market",
-    "A still life of futuristic gadgets on a table",
-    "A dystopian city during a rainstorm"
+# Sample prompts for the random generation feature
+prompts_list = [
+    "Futuristic city at night with neon lights",
+    "Serene sunrise landscape with mountains and a lake",
+    "Astronaut riding a horse on Mars",
+    "Surreal art of a winged cat flying in a starry sky",
+    "Victorian steampunk inventor in her workshop",
+    "Ancient tree with a door in an enchanted forest",
+    "Cybernetic owl digital artwork",
+    "Medieval market scene",
+    "Futuristic gadgets on a table still life",
+    "Dystopian cityscape during a rainstorm"
 ]
 
-def image_generation(prompt):
-    """Generate an image from a prompt using the Hugging Face Stable Diffusion API."""
-    url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+def generate_image(prompt):
+    """Call the Hugging Face API to generate an image based on the input prompt."""
+    api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
     headers = {'Authorization': 'Bearer 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'}
+    
+    response = requests.post(api_url, headers=headers, json={"inputs": prompt})
     try:
-        response = requests.post(url, headers=headers, json={"inputs": prompt})
-        response.raise_for_status()  # Raises an HTTPError for bad responses
+        response.raise_for_status()
         return Image.open(BytesIO(response.content))
-    except requests.exceptions.HTTPError as errh:
-        st.error(f"HTTP Error: {errh}")
-    except requests.exceptions.ConnectionError as errc:
-        st.error(f"Error Connecting: {errc}")
-    except requests.exceptions.Timeout as errt:
-        st.error(f"Timeout Error: {errt}")
-    except requests.exceptions.RequestException as err:
-        st.error(f"Error: {err}")
-    return None
+    except requests.RequestException as e:
+        st.error(f"Failed to fetch image: {str(e)}")
+        return None
 
-def main():
-    st.set_page_config(page_title="G-AI-IG")
-    st.title("AI Image Generator")
-    st.write("Enter a description of the image you want to generate, or generate a random prompt!")
+def app_main():
+    """Main function to run the Streamlit app."""
+    st.set_page_config(page_title="AI-Powered Image Generator")
+    st.header("AI-Powered Image Generator")
+    st.subheader("Generate images from textual descriptions or use a random prompt!")
 
-    if 'prompt' not in st.session_state or st.button("Generate Random Prompt"):
-        st.session_state['prompt'] = random.choice(sample_prompts)
+    # Handling the session state for user prompt
+    if 'prompt' not in st.session_state or st.button("Generate a Random Prompt"):
+        st.session_state['prompt'] = random.choice(prompts_list)
 
-    prompt = st.text_input("Enter the prompt to generate an image:", value=st.session_state['prompt'])
-    st.session_state['prompt'] = prompt
+    user_prompt = st.text_input("Type your prompt below:", value=st.session_state['prompt'])
+    st.session_state['prompt'] = user_prompt
 
     if st.button("Generate Image"):
-        with st.spinner('Generating image... Please wait.'):
-            output_image = image_generation(prompt)
-            if output_image:
-                st.image(output_image, caption="Generated Image", use_column_width=True)
-                st.success("Image generated successfully!")
-                buf = BytesIO()
-                output_image.save(buf, format="PNG")
-                st.download_button("Download Image", buf.getvalue(), file_name="generated_image.png", mime="image/png")
+        with st.spinner('Please wait while your image is being generated...'):
+            generated_image = generate_image(user_prompt)
+            if generated_image:
+                st.image(generated_image, caption="Your AI-generated Image", use_column_width=True)
+                st.success("Image generated successfully! 🎉")
+                buffer = BytesIO()
+                generated_image.save(buffer, format="PNG")
+                st.download_button("Download this Image", buffer.getvalue(), file_name="ai_generated_image.png", mime="image/png")
             else:
-                st.error("Failed to generate image. Please check the prompt or try again later.")
+                st.error("Unable to generate image. Please try again with a different prompt.")
 
 if __name__ == "__main__":
-    main()
+    app_main()
