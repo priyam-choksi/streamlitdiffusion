@@ -21,7 +21,7 @@ sample_prompts = [
 def image_generation(prompt):
     """Generate an image from a prompt using the Hugging Face Stable Diffusion API."""
     url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
-    headers = {'Authorization': 'Bearer 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'}
+    headers = {'Authorization': 'Bearer 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'}
     try:
         response = requests.post(url, headers=headers, json={"inputs": prompt})
         response.raise_for_status()  # Raises an HTTPError for bad responses
